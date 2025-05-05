@@ -43,24 +43,24 @@ const Login = ({ onLogin }: LoginProps) => {
         transition={{ duration: 0.5 }}
         className="w-full max-w-md"
       >
-        <div className="bg-white shadow-lg rounded-lg p-8">
+        <div className="bg-white/10 backdrop-blur-md border border-white/20 shadow-lg rounded-lg p-8">
           <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center p-2 bg-primary-100 rounded-full mb-4">
-              <Brain className="h-8 w-8 text-primary-600" />
+            <div className="inline-flex items-center justify-center p-3 bg-white/10 rounded-full mb-4 border border-white/20">
+              <Brain className="h-8 w-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold mb-2 gradient-text">Knowledge Graph Assistant</h1>
-            <p className="text-gray-600">Sign in to access your knowledge graph</p>
+            <h1 className="text-2xl font-bold mb-2 gradient-text">PotentiAlly</h1>
+            <p className="text-white/80">Sign in to access your personal space</p>
           </div>
           
           <form onSubmit={handleSubmit}>
             <div className="mb-4">
-              <label htmlFor="username" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="username" className="block text-sm font-medium text-white mb-1">
                 Username
               </label>
               <input
                 id="username"
                 type="text"
-                className="input"
+                className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-white/50 focus:border-white/50 bg-white/10 text-white placeholder-white/50"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder="Enter your username"
@@ -69,7 +69,7 @@ const Login = ({ onLogin }: LoginProps) => {
             </div>
             
             {error && (
-              <div className="mb-4 text-sm text-red-600 bg-red-50 p-2 rounded">
+              <div className="mb-4 text-sm text-red-300 bg-red-900/30 p-2 rounded border border-red-400/30">
                 {error}
               </div>
             )}
@@ -78,7 +78,7 @@ const Login = ({ onLogin }: LoginProps) => {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               type="submit"
-              className="btn btn-primary w-full"
+              className="px-4 py-2 rounded-md font-medium w-full transition-colors focus:outline-none bg-white/20 text-white hover:bg-white/30 flex items-center justify-center"
               disabled={isLoading}
             >
               {isLoading ? (
@@ -96,11 +96,11 @@ const Login = ({ onLogin }: LoginProps) => {
           </form>
           
           <div className="mt-6 text-center">
-            <p className="text-gray-600 text-sm">
+            <p className="text-white/70 text-sm">
               New user?{' '}
               <Link 
                 to="/intake" 
-                className="text-blue-600 hover:underline font-medium"
+                className="text-white hover:text-white/80 hover:underline font-medium"
               >
                 Complete the intake survey
               </Link>
