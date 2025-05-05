@@ -35,5 +35,5 @@ A full-stack web application that helps users create and manage a knowledge grap
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/knowledge-graph-assistant.git
-cd knowledge-graph-assistant
+npm install
+npm run dev
