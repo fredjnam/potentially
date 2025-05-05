@@ -50,6 +50,16 @@ export const userService = {
 
     return response.json();
   },
+  
+  getSurvey: async (name: string): Promise<{ surveyData: any }> => {
+    const response = await fetch(`/api/users/${name}/survey`);
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status}`);
+    }
+
+    return response.json();
+  },
 };
 
 // Knowledge Graph Node API calls
@@ -140,7 +150,7 @@ export const chatService = {
     return response.json();
   },
 
-  chatWithAI: async (messages: Array<{ role: string; content: string }>, apiKey?: string) => {
+  chatWithAI: async (username: string, messages: Array<{ role: string; content: string }>, apiKey?: string) => {
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
     };
@@ -149,7 +159,7 @@ export const chatService = {
       headers['x-openai-key'] = apiKey;
     }
 
-    const response = await fetch('/api/chat', {
+    const response = await fetch(`/api/users/${username}/chat`, {
       method: 'POST',
       headers,
       body: JSON.stringify({

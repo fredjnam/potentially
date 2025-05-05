@@ -17,6 +17,32 @@ function App() {
       setUser(storedUser);
     }
   }, []);
+  
+  // Listen for localStorage changes from other components
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const storedUser = localStorage.getItem('potentiallyUser');
+      if (storedUser && storedUser !== user) {
+        setUser(storedUser);
+      }
+    };
+    
+    // Handle custom user login event from survey
+    const handleUserLogin = () => {
+      const storedUser = localStorage.getItem('potentiallyUser');
+      if (storedUser) {
+        setUser(storedUser);
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener('userLoggedIn', handleUserLogin);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener('userLoggedIn', handleUserLogin);
+    };
+  }, [user]);
 
   const handleLogin = (username: string) => {
     setUser(username);
@@ -26,7 +52,7 @@ function App() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem('potentiallyUser');
-    localStorage.removeItem('userDashboardData');
+    localStorage.removeItem('potentiallyUserData');
   };
 
   return (

@@ -72,30 +72,55 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    // First try to get data from route state (from survey)
-    if (location.state) {
-      setData(location.state);
-      localStorage.setItem('userDashboardData', JSON.stringify(location.state));
+    const fetchOrSetSurveyData = async () => {
+      setIsLoaded(false);
       
-      // Save to backend if we have a username
-      if (username) {
-        userService.saveSurvey(username, location.state)
-          .catch(err => console.error("Error saving survey data:", err));
-      }
-      
-      setIsLoaded(true);
-    } else {
-      // Otherwise try to load from localStorage or use default
-      const storedData = localStorage.getItem('userDashboardData');
-      if (storedData) {
-        setData(JSON.parse(storedData));
+      // First try to get data from route state (from survey)
+      if (location.state) {
+        setData(location.state);
+        localStorage.setItem('potentiallyUserData', JSON.stringify(location.state));
+        
+        // Save to backend if we have a username
+        if (username) {
+          try {
+            await userService.saveSurvey(username, location.state);
+          } catch (err) {
+            console.error("Error saving survey data:", err);
+          }
+        }
+        
         setIsLoaded(true);
       } else if (username) {
-        // If we have neither but have a username, we could implement fetching from backend here
-        setData({...defaultDashboardData, name: username});
+        // Try to fetch data from backend first
+        try {
+          const response = await userService.getSurvey(username);
+          if (response.surveyData) {
+            setData(response.surveyData);
+            localStorage.setItem('potentiallyUserData', JSON.stringify(response.surveyData));
+            setIsLoaded(true);
+            return;
+          }
+        } catch (err) {
+          console.error("Error fetching survey data from backend:", err);
+        }
+        
+        // If backend fetch fails, try localStorage
+        const storedData = localStorage.getItem('potentiallyUserData');
+        if (storedData) {
+          setData(JSON.parse(storedData));
+        } else {
+          // Fall back to default with username if nothing else is available
+          setData({...defaultDashboardData, name: username});
+        }
+        setIsLoaded(true);
+      } else {
+        // No username, use default
+        setData(defaultDashboardData);
         setIsLoaded(true);
       }
-    }
+    };
+    
+    fetchOrSetSurveyData();
   }, [location.state, username]);
 
   const containerVariants = {

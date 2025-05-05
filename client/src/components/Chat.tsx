@@ -71,19 +71,13 @@ const Chat = ({ username }: ChatProps) => {
         
         // Get AI response
         try {
-          const aiResponse = await chatService.chatWithAI(messageHistory);
+          const aiResponse = await chatService.chatWithAI(username, messageHistory);
           
-          if (aiResponse.choices && aiResponse.choices[0]?.message) {
-            // In a real app, you'd send this to your backend to save and get a proper message object
-            // This is a simplified example
-            const assistantMessage: Message = {
-              id: Date.now().toString(),
-              content: aiResponse.choices[0].message.content,
-              sender: 'assistant',
-              timestamp: new Date().toISOString()
-            };
-            
-            setMessages(prev => [...prev, assistantMessage]);
+          if (aiResponse.message) {
+            // The backend now handles saving the AI response and returns it
+            setMessages(prev => [...prev, aiResponse.message]);
+          } else {
+            setError('No response from assistant');
           }
         } catch (aiErr) {
           console.error('Error getting AI response:', aiErr);
@@ -152,7 +146,9 @@ const Chat = ({ username }: ChatProps) => {
                       message.sender === 'user' ? 'text-white/60' : 'text-white/60'
                     }`}
                   >
-                    {new Date(message.timestamp).toLocaleTimeString()}
+                    {message.timestamp ? 
+                      new Date(typeof message.timestamp === 'string' ? message.timestamp : message.timestamp.toString()).toLocaleTimeString() 
+                      : ''}
                   </div>
                 </div>
               </div>

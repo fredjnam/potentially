@@ -114,6 +114,36 @@ app.post('/api/users/:name/survey', async (req, res) => {
   }
 });
 
+// Get user survey data
+app.get('/api/users/:name/survey', async (req, res) => {
+  const { name } = req.params;
+  
+  const session = driver.session();
+  try {
+    const result = await session.run(
+      'MATCH (u:User {name: $name}) RETURN u.surveyData',
+      { name }
+    );
+    
+    if (result.records.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    
+    const surveyDataString = result.records[0].get('u.surveyData');
+    if (!surveyDataString) {
+      return res.status(404).json({ error: 'Survey data not found for user' });
+    }
+    
+    const surveyData = JSON.parse(surveyDataString);
+    res.json({ surveyData });
+  } catch (error) {
+    console.error('Error fetching survey data:', error);
+    res.status(500).json({ error: 'Failed to fetch survey data' });
+  } finally {
+    await session.close();
+  }
+});
+
 // 3. Knowledge Graph Node Routes
 app.post('/api/users/:name/nodes', async (req, res) => {
   const { name } = req.params;
@@ -238,16 +268,84 @@ app.get('/api/users/:name/messages', async (req, res) => {
   const session = driver.session();
   try {
     const result = await session.run(
-      `MATCH (u:User {name: $name})-[:SENT]->(m:Message)
+      `MATCH (u:User {name: $name})-[:SENT|:RECEIVED]->(m:Message)
        RETURN m ORDER BY m.timestamp`,
       { name }
     );
     
-    const messages = result.records.map(record => record.get('m').properties);
+    const messages = result.records.map(record => {
+      const properties = record.get('m').properties;
+      // Convert Neo4j datetime to ISO string format for JavaScript
+      if (properties.timestamp && properties.timestamp.toString) {
+        properties.timestamp = properties.timestamp.toString();
+      }
+      return properties;
+    });
+    
     res.json({ messages });
   } catch (error) {
     console.error('Error fetching messages:', error);
     res.status(500).json({ error: 'Failed to fetch messages' });
+  } finally {
+    await session.close();
+  }
+});
+
+// Add a new endpoint to handle AI chat
+app.post('/api/users/:name/chat', async (req, res) => {
+  const { name } = req.params;
+  const { messages, model = 'gpt-4' } = req.body;
+  const apiKey = req.headers['x-openai-key'] || process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    return res.status(400).json({ error: 'OpenAI API key is required' });
+  }
+  
+  const session = driver.session();
+  try {
+    // Call OpenAI API
+    const openaiResponse = await axios.post(
+      'https://api.openai.com/v1/chat/completions',
+      {
+        model,
+        messages,
+        temperature: 0.7
+      },
+      {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+    
+    if (!openaiResponse.data.choices || !openaiResponse.data.choices[0]?.message) {
+      throw new Error('Invalid response from OpenAI');
+    }
+    
+    const aiContent = openaiResponse.data.choices[0].message.content;
+    
+    // Save the AI response to the database
+    const result = await session.run(
+      `MATCH (u:User {name: $name})
+       CREATE (m:Message {id: randomUUID(), content: $content, sender: 'assistant', timestamp: datetime()})
+       CREATE (u)-[:RECEIVED]->(m)
+       RETURN m`,
+      { name, content: aiContent }
+    );
+    
+    const message = result.records[0].get('m').properties;
+    // Convert Neo4j datetime to ISO string format
+    if (message.timestamp && message.timestamp.toString) {
+      message.timestamp = message.timestamp.toString();
+    }
+    
+    res.json({ message, choices: openaiResponse.data.choices });
+  } catch (error) {
+    console.error('OpenAI API error:', error.response?.data || error.message);
+    res.status(error.response?.status || 500).json({
+      error: error.response?.data?.error || error.message
+    });
   } finally {
     await session.close();
   }

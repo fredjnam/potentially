@@ -715,16 +715,29 @@ export const Element = (): JSX.Element => {
     // Store user in localStorage for auth
     localStorage.setItem('potentiallyUser', name);
     
-    // Save survey data to backend
-    userService.saveSurvey(name, surveyData)
+    // Also store survey data in localStorage as a backup
+    localStorage.setItem('potentiallyUserData', JSON.stringify(surveyData));
+    
+    // Create user first to ensure they are registered
+    userService.createUser(name)
       .then(() => {
-        // Navigate to the dashboard with the survey data
-        navigate('/', {
-          state: surveyData
-        });
+        // Then save survey data
+        return userService.saveSurvey(name, surveyData);
+      })
+      .then(() => {
+        // Fire a custom event to notify App.tsx about user login
+        window.dispatchEvent(new Event("userLoggedIn"));
+        
+        // Give some time for the App component to update
+        setTimeout(() => {
+          // Navigate to the dashboard with the survey data
+          navigate('/', {
+            state: surveyData
+          });
+        }, 100);
       })
       .catch(err => {
-        console.error("Error saving survey data:", err);
+        console.error("Error during user creation or saving survey data:", err);
         // Navigate anyway, but show error
         navigate('/', {
           state: surveyData
