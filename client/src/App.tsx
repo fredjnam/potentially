@@ -2,16 +2,17 @@ import { useState, useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Header from './components/Header';
 import Login from './components/Login';
-import Dashboard from './components/Dashboard';
+import Dashboard from './screens/Dashboard';
 import KnowledgeGraph from './components/KnowledgeGraph';
 import Chat from './components/Chat';
+import { Element } from './screens/Element';
 
 function App() {
   const [user, setUser] = useState<string | null>(null);
 
   // Check if user is stored in localStorage on app load
   useEffect(() => {
-    const storedUser = localStorage.getItem('knowledgeGraphUser');
+    const storedUser = localStorage.getItem('potentiallyUser');
     if (storedUser) {
       setUser(storedUser);
     }
@@ -19,26 +20,30 @@ function App() {
 
   const handleLogin = (username: string) => {
     setUser(username);
-    localStorage.setItem('knowledgeGraphUser', username);
+    localStorage.setItem('potentiallyUser', username);
   };
 
   const handleLogout = () => {
     setUser(null);
-    localStorage.removeItem('knowledgeGraphUser');
+    localStorage.removeItem('potentiallyUser');
+    localStorage.removeItem('userDashboardData');
   };
 
   return (
     <BrowserRouter>
-      <div className="flex flex-col min-h-screen">
+      <div className="flex flex-col min-h-screen bg-gradient-to-b from-purple-800 to-blue-700 text-white">
         <Header user={user} onLogout={handleLogout} />
         
-        <main className="flex-1 container mx-auto px-4 py-6">
+        <main className="flex-1">
           <Routes>
             <Route path="/" element={
               user ? <Dashboard username={user} /> : <Navigate to="/login" />
             } />
             <Route path="/login" element={
               user ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
+            } />
+            <Route path="/intake" element={
+              user ? <Navigate to="/" /> : <Element />
             } />
             <Route path="/knowledge-graph" element={
               user ? <KnowledgeGraph username={user} /> : <Navigate to="/login" />
@@ -49,9 +54,9 @@ function App() {
           </Routes>
         </main>
         
-        <footer className="bg-gray-100 py-4 border-t">
-          <div className="container mx-auto px-4 text-center text-gray-600 text-sm">
-            &copy; {new Date().getFullYear()} Knowledge Graph Assistant
+        <footer className="bg-white/10 backdrop-blur-md py-4 border-t border-white/20">
+          <div className="container mx-auto px-4 text-center text-white/70 text-sm">
+            &copy; {new Date().getFullYear()} PotentiAlly
           </div>
         </footer>
       </div>

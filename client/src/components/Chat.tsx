@@ -100,8 +100,8 @@ const Chat = ({ username }: ChatProps) => {
 
   return (
     <div className="max-w-4xl mx-auto">
-      <div className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col h-[calc(100vh-12rem)]">
-        <div className="bg-primary-600 text-white px-4 py-3">
+      <div className="bg-white/10 backdrop-blur-md rounded-lg shadow-lg border border-white/20 overflow-hidden flex flex-col h-[calc(100vh-12rem)]">
+        <div className="bg-white/10 backdrop-blur-md px-4 py-3 border-b border-white/20">
           <h2 className="text-lg font-semibold">AI Chat Assistant</h2>
         </div>
         
@@ -111,11 +111,11 @@ const Chat = ({ username }: ChatProps) => {
         >
           {isLoading ? (
             <div className="flex justify-center items-center h-full">
-              <Loader className="h-8 w-8 text-primary-500 animate-spin" />
+              <Loader className="h-8 w-8 text-white animate-spin" />
             </div>
           ) : messages.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-gray-500">
-              <Bot className="h-12 w-12 text-primary-200 mb-3" />
+            <div className="flex flex-col items-center justify-center h-full text-white/70">
+              <Bot className="h-12 w-12 text-white/50 mb-3" />
               <p>No messages yet. Start a conversation!</p>
             </div>
           ) : (
@@ -129,8 +129,8 @@ const Chat = ({ username }: ChatProps) => {
                 <div
                   className={`max-w-[75%] rounded-lg px-4 py-2 ${
                     message.sender === 'user'
-                      ? 'bg-primary-600 text-white'
-                      : 'bg-gray-100'
+                      ? 'bg-white/20 text-white backdrop-blur-md'
+                      : 'bg-white/10 text-white backdrop-blur-md'
                   }`}
                 >
                   <div className="flex items-center mb-1">
@@ -149,7 +149,7 @@ const Chat = ({ username }: ChatProps) => {
                   <p className="whitespace-pre-wrap">{message.content}</p>
                   <div
                     className={`text-xs mt-1 ${
-                      message.sender === 'user' ? 'text-primary-200' : 'text-gray-500'
+                      message.sender === 'user' ? 'text-white/60' : 'text-white/60'
                     }`}
                   >
                     {new Date(message.timestamp).toLocaleTimeString()}
@@ -161,11 +161,11 @@ const Chat = ({ username }: ChatProps) => {
           <div ref={messagesEndRef} />
         </div>
         
-        <div className="border-t p-4">
+        <div className="border-t border-white/20 p-4">
           <form onSubmit={handleSendMessage} className="flex">
             <input
               type="text"
-              className="input rounded-r-none focus:z-10"
+              className="w-full px-3 py-2 border border-white/30 rounded-l-md shadow-sm focus:outline-none focus:ring-white/50 focus:border-white/50 bg-white/10 text-white placeholder-white/50"
               placeholder="Type your message..."
               value={inputValue}
               onChange={(e) => setInputValue(e.target.value)}
@@ -173,7 +173,7 @@ const Chat = ({ username }: ChatProps) => {
             />
             <button
               type="submit"
-              className="btn btn-primary rounded-l-none flex items-center"
+              className="px-4 py-2 rounded-r-md font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 bg-white/20 text-white hover:bg-white/30 focus:ring-white/40 flex items-center"
               disabled={isLoading || isSending || !inputValue.trim()}
             >
               {isSending ? (
@@ -188,7 +188,7 @@ const Chat = ({ username }: ChatProps) => {
           </form>
           
           {error && (
-            <div className="mt-2 text-sm text-red-600">
+            <div className="mt-2 text-sm text-red-300">
               {error}
             </div>
           )}

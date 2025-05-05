@@ -181,10 +181,10 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
   return (
     <div className="animate-fade-in">
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Knowledge Graph</h1>
+        <h1 className="text-2xl font-bold text-white">Knowledge Graph</h1>
         <button
           onClick={handleCreateNode}
-          className="btn btn-primary flex items-center"
+          className="px-4 py-2 rounded-md font-medium transition-colors focus:outline-none bg-white/20 text-white hover:bg-white/30 flex items-center"
           disabled={isLoading}
         >
           <Plus className="h-5 w-5 mr-1" />
@@ -193,7 +193,7 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded mb-4">
+        <div className="bg-red-900/30 border border-red-400/30 text-red-300 px-4 py-3 rounded mb-4">
           {error}
         </div>
       )}
@@ -203,17 +203,17 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
         <div className="space-y-4">
           {isLoading && nodes.length === 0 ? (
             <div className="flex justify-center py-12">
-              <Loader className="h-8 w-8 text-primary-500 animate-spin" />
+              <Loader className="h-8 w-8 text-white animate-spin" />
             </div>
           ) : nodes.length === 0 ? (
-            <div className="bg-gray-50 border border-gray-200 rounded-lg p-8 text-center">
-              <h2 className="text-lg font-medium mb-2">No Nodes Yet</h2>
-              <p className="text-gray-600 mb-4">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-lg p-8 text-center">
+              <h2 className="text-lg font-medium mb-2 text-white">No Nodes Yet</h2>
+              <p className="text-white/70 mb-4">
                 Your knowledge graph is empty. Create your first node to get started!
               </p>
               <button
                 onClick={handleCreateNode}
-                className="btn btn-primary"
+                className="px-4 py-2 rounded-md font-medium transition-colors focus:outline-none bg-white/20 text-white hover:bg-white/30"
               >
                 Create First Node
               </button>
@@ -222,23 +222,23 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
             nodes.map((node) => (
               <div
                 key={node.id}
-                className={`card ${
-                  node.id === editingNode.id ? 'border-2 border-primary-500' : ''
+                className={`bg-white/10 backdrop-blur-md rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow duration-200 border border-white/20 ${
+                  node.id === editingNode.id ? 'border-2 border-white' : ''
                 }`}
               >
-                <h3 className="font-medium mb-1 truncate">{node.title}</h3>
-                <p className="text-gray-600 text-sm mb-3 line-clamp-2">{node.content}</p>
+                <h3 className="font-medium mb-1 truncate text-white">{node.title}</h3>
+                <p className="text-white/70 text-sm mb-3 line-clamp-2">{node.content}</p>
                 <div className="flex justify-end space-x-2">
                   <button
                     onClick={() => handleEditNode(node)}
-                    className="p-1 text-primary-700 hover:bg-primary-50 rounded"
+                    className="p-1 text-white hover:bg-white/10 rounded"
                     title="Edit"
                   >
                     <Edit className="h-5 w-5" />
                   </button>
                   <button
                     onClick={() => handleDeleteNode(node.id)}
-                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                    className="p-1 text-white hover:bg-white/10 hover:text-red-300 rounded"
                     title="Delete"
                   >
                     <Trash2 className="h-5 w-5" />
@@ -251,14 +251,14 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
 
         {/* Edit form */}
         {isEditing && (
-          <div className="card">
+          <div className="bg-white/10 backdrop-blur-md rounded-lg shadow-md p-4 hover:shadow-lg transition-shadow duration-200 border border-white/20">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-medium">
+              <h2 className="text-lg font-medium text-white">
                 {'id' in editingNode ? 'Edit Node' : 'Create Node'}
               </h2>
               <button
                 onClick={handleCancelEdit}
-                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                className="p-1 text-white hover:bg-white/10 rounded"
                 title="Cancel"
               >
                 <X className="h-5 w-5" />
@@ -267,7 +267,7 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
             
             <div className="space-y-4">
               <div>
-                <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="title" className="block text-sm font-medium text-white mb-1">
                   Title
                 </label>
                 <input
@@ -275,13 +275,13 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
                   type="text"
                   value={editingNode.title || ''}
                   onChange={(e) => setEditingNode({ ...editingNode, title: e.target.value })}
-                  className="input"
+                  className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-white/50 focus:border-white/50 bg-white/10 text-white placeholder-white/50"
                   placeholder="Node title"
                 />
               </div>
               
               <div>
-                <label htmlFor="content" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="content" className="block text-sm font-medium text-white mb-1">
                   Content
                 </label>
                 <textarea
@@ -289,7 +289,7 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
                   value={editingNode.content || ''}
                   onChange={(e) => setEditingNode({ ...editingNode, content: e.target.value })}
                   rows={6}
-                  className="input"
+                  className="w-full px-3 py-2 border border-white/30 rounded-md shadow-sm focus:outline-none focus:ring-white/50 focus:border-white/50 bg-white/10 text-white placeholder-white/50"
                   placeholder="Node content..."
                 />
               </div>
@@ -298,7 +298,7 @@ const KnowledgeGraph = ({ username }: KnowledgeGraphProps) => {
                 <button
                   onClick={handleSaveNode}
                   disabled={isLoading}
-                  className="btn btn-primary flex items-center"
+                  className="px-4 py-2 rounded-md font-medium transition-colors focus:outline-none bg-white/20 text-white hover:bg-white/30 flex items-center"
                 >
                   {isLoading ? (
                     <Loader className="h-5 w-5 mr-1 animate-spin" />

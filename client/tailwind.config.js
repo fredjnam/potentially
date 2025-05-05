@@ -20,6 +20,13 @@ export default {
           900: '#0c4a6e',
           950: '#082f49',
         },
+        purple: {
+          800: '#6B46C1',
+        },
+        blue: {
+          500: '#3B82F6',
+          700: '#1D4ED8',
+        }
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
@@ -37,6 +44,13 @@ export default {
           '0%': { transform: 'translateY(20px)', opacity: '0' },
           '100%': { transform: 'translateY(0)', opacity: '1' },
         },
+      },
+      backdropBlur: {
+        xs: '2px',
+        sm: '4px',
+        md: '8px',
+        lg: '12px',
+        xl: '16px',
       },
     },
   },

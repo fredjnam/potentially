@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
 import { userService } from '../services/api';
 import { Brain } from 'lucide-react';
 
@@ -23,7 +25,7 @@ const Login = ({ onLogin }: LoginProps) => {
       setIsLoading(true);
       setError(null);
       
-      const result = await userService.createUser(username);
+      await userService.createUser(username);
       onLogin(username);
     } catch (err) {
       console.error('Login error:', err);
@@ -35,7 +37,12 @@ const Login = ({ onLogin }: LoginProps) => {
 
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-10rem)]">
-      <div className="w-full max-w-md animate-slide-up">
+      <motion.div 
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="w-full max-w-md"
+      >
         <div className="bg-white shadow-lg rounded-lg p-8">
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center p-2 bg-primary-100 rounded-full mb-4">
@@ -67,7 +74,9 @@ const Login = ({ onLogin }: LoginProps) => {
               </div>
             )}
             
-            <button
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               type="submit"
               className="btn btn-primary w-full"
               disabled={isLoading}
@@ -83,14 +92,22 @@ const Login = ({ onLogin }: LoginProps) => {
               ) : (
                 'Sign In'
               )}
-            </button>
+            </motion.button>
           </form>
           
-          <div className="mt-6 text-sm text-center text-gray-600">
-            <p>No account needed. Enter any username to get started.</p>
+          <div className="mt-6 text-center">
+            <p className="text-gray-600 text-sm">
+              New user?{' '}
+              <Link 
+                to="/intake" 
+                className="text-blue-600 hover:underline font-medium"
+              >
+                Complete the intake survey
+              </Link>
+            </p>
           </div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };
