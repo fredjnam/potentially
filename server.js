@@ -151,15 +151,51 @@ app.post('/api/users/:name/nodes', async (req, res) => {
   
   const session = driver.session();
   try {
-    const result = await session.run(
+    // First ensure the user has a knowledge graph
+    await session.run(
       `MATCH (u:User {name: $name})
-       CREATE (n:Node {id: randomUUID(), title: $title, content: $content, position: $position, createdAt: datetime()})
+       MERGE (kg:KnowledgeGraph {userId: $name})
+       MERGE (u)-[:HAS_KNOWLEDGE_GRAPH]->(kg)`,
+      { name }
+    );
+    
+    // Create the node
+    const nodeResult = await session.run(
+      `MATCH (u:User {name: $name})-[:HAS_KNOWLEDGE_GRAPH]->(kg:KnowledgeGraph)
+       CREATE (n:Node {
+         id: randomUUID(), 
+         title: $title, 
+         content: $content, 
+         position: $position, 
+         createdAt: datetime(),
+         userId: $name
+       })
        CREATE (u)-[:CREATED]->(n)
+       CREATE (kg)-[:CONTAINS]->(n)
        RETURN n`,
       { name, title, content, position: JSON.stringify(position) }
     );
     
-    const node = result.records[0].get('n').properties;
+    const node = nodeResult.records[0].get('n').properties;
+    
+    // Also create a corresponding node in the user's knowledge graph with the title as the name
+    await session.run(
+      `MATCH (u:User {name: $name})-[:HAS_KNOWLEDGE_GRAPH]->(kg:KnowledgeGraph)
+       MERGE (t:Topic {name: $title, userId: $name})
+       SET t.description = $content,
+           t.nodeId = $nodeId,
+           t.created = datetime(),
+           t.source = 'user_created'
+       MERGE (kg)-[:CONTAINS]->(t)
+       RETURN t`,
+      { 
+        name, 
+        title, 
+        content, 
+        nodeId: node.id 
+      }
+    );
+    
     res.json({ node });
   } catch (error) {
     console.error('Error creating node:', error);
@@ -176,6 +212,7 @@ app.get('/api/users/:name/nodes', async (req, res) => {
   try {
     const result = await session.run(
       `MATCH (u:User {name: $name})-[:CREATED]->(n:Node)
+       WHERE n.userId = $name
        RETURN n ORDER BY n.createdAt`,
       { name }
     );
@@ -196,10 +233,11 @@ app.put('/api/nodes/:id', async (req, res) => {
   
   const session = driver.session();
   try {
+    // Update the node
     const result = await session.run(
       `MATCH (n:Node {id: $id})
        SET n += $updates
-       RETURN n`,
+       RETURN n, n.userId as userId`,
       { id, updates }
     );
     
@@ -208,6 +246,31 @@ app.put('/api/nodes/:id', async (req, res) => {
     }
     
     const node = result.records[0].get('n').properties;
+    const userId = result.records[0].get('userId');
+    
+    // Also update the corresponding topic in the knowledge graph
+    if (updates.title) {
+      await session.run(
+        `MATCH (kg:KnowledgeGraph {userId: $userId})-[:CONTAINS]->(t:Topic)
+         WHERE t.nodeId = $nodeId
+         SET t.name = $title,
+             t.updated = datetime()
+         RETURN t`,
+        { userId, nodeId: id, title: updates.title }
+      );
+    }
+    
+    if (updates.content) {
+      await session.run(
+        `MATCH (kg:KnowledgeGraph {userId: $userId})-[:CONTAINS]->(t:Topic)
+         WHERE t.nodeId = $nodeId
+         SET t.description = $content,
+             t.updated = datetime()
+         RETURN t`,
+        { userId, nodeId: id, content: updates.content }
+      );
+    }
+    
     res.json({ node });
   } catch (error) {
     console.error('Error updating node:', error);
@@ -222,6 +285,28 @@ app.delete('/api/nodes/:id', async (req, res) => {
   
   const session = driver.session();
   try {
+    // First get the userId to identify knowledge graph
+    const nodeResult = await session.run(
+      `MATCH (n:Node {id: $id})
+       RETURN n.userId as userId`,
+      { id }
+    );
+    
+    if (nodeResult.records.length === 0) {
+      return res.json({ success: true }); // Node already deleted
+    }
+    
+    const userId = nodeResult.records[0].get('userId');
+    
+    // Delete the corresponding topic in the knowledge graph
+    await session.run(
+      `MATCH (kg:KnowledgeGraph {userId: $userId})-[:CONTAINS]->(t:Topic)
+       WHERE t.nodeId = $id
+       DETACH DELETE t`,
+      { userId, id }
+    );
+    
+    // Delete the node
     await session.run(
       `MATCH (n:Node {id: $id})
        DETACH DELETE n`,
@@ -291,7 +376,10 @@ app.get('/api/users/:name/messages', async (req, res) => {
   }
 });
 
-// Add a new endpoint to handle AI chat
+// Import knowledge extractor functions
+const { extractKnowledgeGraph, updateKnowledgeGraph, getUserKnowledgeGraph } = require('./src/counselor/knowledgeExtractor');
+
+// Add a new endpoint to handle AI chat with knowledge graph integration
 app.post('/api/users/:name/chat', async (req, res) => {
   const { name } = req.params;
   const { messages, model = 'gpt-4' } = req.body;
@@ -303,12 +391,37 @@ app.post('/api/users/:name/chat', async (req, res) => {
   
   const session = driver.session();
   try {
-    // Call OpenAI API
+    // Get user survey data for personalization
+    const userResult = await session.run(
+      `MATCH (u:User {name: $name}) RETURN u.surveyData`,
+      { name }
+    );
+    
+    const surveyDataString = userResult.records.length > 0 ? userResult.records[0].get('u.surveyData') : null;
+    const surveyData = surveyDataString ? JSON.parse(surveyDataString) : {};
+    
+    // Get existing knowledge graph for context
+    const knowledgeGraph = await getUserKnowledgeGraph(name, session);
+    
+    // Prepare enhanced system prompt with knowledge graph context
+    let enhancedMessages = [...messages];
+    if (enhancedMessages.length > 0 && enhancedMessages[0].role === "system") {
+      // Enhance existing system message
+      enhancedMessages[0].content = `${enhancedMessages[0].content}\n\nSTUDENT CONTEXT:\n${JSON.stringify(surveyData, null, 2)}\n\nKNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`;
+    } else {
+      // Add system message if none exists
+      enhancedMessages.unshift({
+        role: "system",
+        content: `${baseSystemPrompt}\n\nSTUDENT CONTEXT:\n${JSON.stringify(surveyData, null, 2)}\n\nKNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`
+      });
+    }
+    
+    // Call OpenAI API with enhanced context
     const openaiResponse = await axios.post(
       'https://api.openai.com/v1/chat/completions',
       {
         model,
-        messages,
+        messages: enhancedMessages,
         temperature: 0.7
       },
       {
@@ -339,6 +452,28 @@ app.post('/api/users/:name/chat', async (req, res) => {
     if (message.timestamp && message.timestamp.toString) {
       message.timestamp = message.timestamp.toString();
     }
+    
+    // Get the user's last message
+    const userMessage = messages.filter(msg => msg.role === 'user').pop()?.content || '';
+    
+    // Extract knowledge graph data from the interaction (asynchronously, don't wait for completion)
+    extractKnowledgeGraph(userMessage, aiContent, knowledgeGraph, surveyData)
+      .then(extractedData => {
+        console.log('Extracted knowledge graph data:', JSON.stringify(extractedData, null, 2));
+        // Create a new session for background processing
+        const updateSession = driver.session();
+        return updateKnowledgeGraph(extractedData, name, updateSession)
+          .finally(() => {
+            // Always close the session when done
+            updateSession.close();
+          });
+      })
+      .then(updateResult => {
+        console.log('Knowledge graph update result:', updateResult);
+      })
+      .catch(error => {
+        console.error('Error in knowledge graph extraction process:', error);
+      });
     
     res.json({ message, choices: openaiResponse.data.choices });
   } catch (error) {
@@ -553,6 +688,92 @@ app.get('/api/users/:name/counselor-history', async (req, res) => {
   } catch (error) {
     console.error('Error fetching counselor history:', error);
     res.status(500).json({ error: 'Failed to fetch counselor history' });
+  } finally {
+    await session.close();
+  }
+});
+
+// Get knowledge graph for a user
+app.get('/api/users/:name/knowledge-graph', async (req, res) => {
+  const { name } = req.params;
+  const { format = 'default' } = req.query;
+  
+  const session = driver.session();
+  try {
+    // Ensure the user has a knowledge graph node
+    await session.run(
+      `MATCH (u:User {name: $name})
+       MERGE (kg:KnowledgeGraph {userId: $name})
+       MERGE (u)-[:HAS_KNOWLEDGE_GRAPH]->(kg)`,
+      { name }
+    );
+    
+    // Get all nodes in this user's knowledge graph
+    const nodesResult = await session.run(
+      `MATCH (u:User {name: $name})-[:HAS_KNOWLEDGE_GRAPH]->(kg:KnowledgeGraph)
+       MATCH (kg)-[:CONTAINS]->(n)
+       WHERE n.userId = $name
+       RETURN n, labels(n) as labels`,
+      { name }
+    );
+    
+    // Get all relationships between nodes in this user's knowledge graph
+    const relsResult = await session.run(
+      `MATCH (u:User {name: $name})-[:HAS_KNOWLEDGE_GRAPH]->(kg:KnowledgeGraph)
+       MATCH (kg)-[:CONTAINS]->(source {userId: $name})-[r]->(target {userId: $name})<-[:CONTAINS]-(kg)
+       RETURN source.name as fromName, target.name as toName, type(r) as type, properties(r) as properties`,
+      { name }
+    );
+    
+    if (format === 'vis') {
+      // Format for visualization libraries like vis.js
+      const nodes = nodesResult.records.map(record => {
+        const node = record.get('n');
+        const labels = record.get('labels');
+        return {
+          id: node.properties.name,
+          label: node.properties.name,
+          title: node.properties.description || node.properties.name,
+          group: labels[0] // Use first label as group
+        };
+      });
+      
+      const edges = relsResult.records.map(record => {
+        return {
+          from: record.get('fromName'),
+          to: record.get('toName'),
+          label: record.get('type').replace('_', ' ').toLowerCase(),
+          title: record.get('properties').description || ''
+        };
+      });
+      
+      res.json({ nodes, edges });
+    } else {
+      // Default format (more detailed)
+      const nodes = nodesResult.records.map(record => {
+        const node = record.get('n');
+        const labels = record.get('labels');
+        return {
+          id: node.properties.name,
+          label: labels[0],
+          properties: node.properties
+        };
+      });
+      
+      const relationships = relsResult.records.map(record => {
+        return {
+          from: record.get('fromName'),
+          to: record.get('toName'),
+          type: record.get('type'),
+          properties: record.get('properties')
+        };
+      });
+      
+      res.json({ nodes, relationships });
+    }
+  } catch (error) {
+    console.error('Error fetching knowledge graph:', error);
+    res.status(500).json({ error: 'Failed to fetch knowledge graph' });
   } finally {
     await session.close();
   }

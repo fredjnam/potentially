@@ -21,6 +21,44 @@ export interface Message {
   timestamp: string;
 }
 
+export interface KnowledgeGraphNode {
+  id: string;
+  label: string;
+  properties: {
+    name: string;
+    description?: string;
+    source?: string;
+    confidence?: number;
+    relevance?: string;
+    [key: string]: any;
+  };
+}
+
+export interface KnowledgeGraphRelationship {
+  from: string;
+  to: string;
+  type: string;
+  properties: {
+    description?: string;
+    strength?: number;
+    [key: string]: any;
+  };
+}
+
+export interface VisGraphNode {
+  id: string;
+  label: string;
+  title: string;
+  group: string;
+}
+
+export interface VisGraphEdge {
+  from: string;
+  to: string;
+  label: string;
+  title: string;
+}
+
 // User-related API calls
 export const userService = {
   createUser: async (name: string): Promise<{ user: User }> => {
@@ -167,6 +205,19 @@ export const chatService = {
         messages,
       }),
     });
+
+    if (!response.ok) {
+      throw new Error(`Error: ${response.status}`);
+    }
+
+    return response.json();
+  },
+};
+
+// Knowledge Graph API calls
+export const knowledgeGraphService = {
+  getKnowledgeGraph: async (username: string, format: 'default' | 'vis' = 'default') => {
+    const response = await fetch(`/api/users/${username}/knowledge-graph?format=${format}`);
 
     if (!response.ok) {
       throw new Error(`Error: ${response.status}`);
