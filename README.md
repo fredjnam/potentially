@@ -36,4 +36,5 @@ A full-stack web application that helps users create and manage a knowledge grap
 1. Clone the repository:
 ```bash
 npm install
+npm run setup
 npm run dev
