@@ -126,6 +126,9 @@ app.post('/api/users/:name/survey', async (req, res) => {
       { name, surveyData: JSON.stringify(surveyData) }
     );
     
+    // Initialize or update the knowledge graph with survey data
+    await initializeKnowledgeGraphFromSurvey(name, surveyData, session);
+    
     res.json({ success: true });
   } catch (error) {
     console.error('Error saving survey data:', error);
@@ -399,6 +402,7 @@ app.get('/api/users/:name/messages', async (req, res) => {
 
 // Import knowledge extractor functions
 const { extractKnowledgeGraph, updateKnowledgeGraph, getUserKnowledgeGraph } = require('./src/counselor/knowledgeExtractor');
+const { initializeHierarchicalKnowledgeGraph } = require('./src/counselor/hierarchicalKnowledgeExtractor');
 
 // Add a new endpoint to handle AI chat with knowledge graph integration
 app.post('/api/users/:name/chat', async (req, res) => {
@@ -412,28 +416,30 @@ app.post('/api/users/:name/chat', async (req, res) => {
   
   const session = driver.session();
   try {
-    // Get user survey data for personalization
-    const userResult = await session.run(
-      `MATCH (u:User {name: $name}) RETURN u.surveyData`,
-      { name }
-    );
-    
-    const surveyDataString = userResult.records.length > 0 ? userResult.records[0].get('u.surveyData') : null;
-    const surveyData = surveyDataString ? JSON.parse(surveyDataString) : {};
-    
     // Get existing knowledge graph for context
-    const knowledgeGraph = await getUserKnowledgeGraph(name, session);
+    let knowledgeGraph = await getUserKnowledgeGraph(name, session);
+    
+    // Ensure we have a valid knowledge graph for this user
+    if (!knowledgeGraph.nodes || knowledgeGraph.nodes.length === 0) {
+      // Ensure the user has a knowledge graph node even if empty
+      await session.run(
+        `MATCH (u:User {name: $name})
+         MERGE (kg:KnowledgeGraph {userId: $name})
+         MERGE (u)-[:HAS_KNOWLEDGE_GRAPH]->(kg)`,
+        { name }
+      );
+    }
     
     // Prepare enhanced system prompt with knowledge graph context
     let enhancedMessages = [...messages];
     if (enhancedMessages.length > 0 && enhancedMessages[0].role === "system") {
       // Enhance existing system message
-      enhancedMessages[0].content = `${enhancedMessages[0].content}\n\nSTUDENT CONTEXT:\n${JSON.stringify(surveyData, null, 2)}\n\nKNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`;
+      enhancedMessages[0].content = `${enhancedMessages[0].content}\n\nSTUDENT KNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`;
     } else {
       // Add system message if none exists
       enhancedMessages.unshift({
         role: "system",
-        content: `${baseSystemPrompt}\n\nSTUDENT CONTEXT:\n${JSON.stringify(surveyData, null, 2)}\n\nKNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`
+        content: `${baseSystemPrompt}\n\nSTUDENT KNOWLEDGE GRAPH:\n${JSON.stringify(knowledgeGraph, null, 2)}`
       });
     }
     
@@ -478,7 +484,8 @@ app.post('/api/users/:name/chat', async (req, res) => {
     const userMessage = messages.filter(msg => msg.role === 'user').pop()?.content || '';
     
     // Extract knowledge graph data from the interaction (asynchronously, don't wait for completion)
-    extractKnowledgeGraph(userMessage, aiContent, knowledgeGraph, surveyData)
+    // Pass an empty object for surveyData since we're now exclusively using knowledge graph
+    extractKnowledgeGraph(userMessage, aiContent, knowledgeGraph, {})
       .then(extractedData => {
         console.log('Extracted knowledge graph data:', JSON.stringify(extractedData, null, 2));
         // Create a new session for background processing
@@ -781,6 +788,20 @@ app.get('/api/users/:name/knowledge-graph', async (req, res) => {
     await session.close();
   }
 });
+
+// Function to initialize knowledge graph from survey data
+async function initializeKnowledgeGraphFromSurvey(username, surveyData, session) {
+  try {
+    console.log('Initializing knowledge graph using rule-based approach...');
+
+    // Call the hierarchical knowledge graph function instead of LLM
+    return await initializeHierarchicalKnowledgeGraph(username, surveyData, session);
+
+  } catch (error) {
+    console.error('Error initializing knowledge graph from survey:', error);
+    return false;
+  }
+}
 
 // Start the server
 app.listen(port, () => {

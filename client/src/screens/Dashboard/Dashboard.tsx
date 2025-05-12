@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
-import { NavigationArrow } from "../../components/ui/navigation-arrow";
-import { userService } from "../../services/api";
+import { Plus, Pencil, X, Check, Trash2 } from "lucide-react";
+import { userService, knowledgeGraphService, nodeService } from "../../services/api";
 
 const defaultDashboardData = {
   name: "User",
@@ -21,42 +21,30 @@ const defaultDashboardData = {
   reasons: ["Passion for growth", "Desire to help others", "Love for innovation"]
 };
 
-const hoverContent = {
-  values: {
-    title: "Your Core Values",
-    description: "These traits define your authentic self and guide your decisions. They're the compass that keeps you true to your path.",
-    items: [
-      "Empathy allows you to connect deeply with others",
-      "Creativity drives your innovative solutions",
-      "Determination helps you overcome challenges"
-    ]
-  },
-  dreams: {
-    title: "Your Aspirations",
-    description: "These dreams represent the future you're building. They're not just goals, but the legacy you wish to create.",
-    items: [
-      "Your relationships create lasting positive impact",
-      "Your impact ripples through communities",
-      "Your goals align with your deepest values"
-    ]
-  },
+const quadrantConfig = {
   strengths: {
-    title: "Your Natural Gifts",
-    description: "These strengths are your unique advantages. They're the tools you use to overcome challenges and create impact.",
-    items: [
-      "You excel at building meaningful connections",
-      "Your innovative thinking opens new possibilities",
-      "Your drive for impact creates positive change"
-    ]
+    title: "Who You Are (Strengths)",
+    field: "personalTraits",
+    type: "string",
+    nodeType: "Strength"
   },
-  priorities: {
-    title: "Your Focus Areas",
-    description: "These priorities shape your journey. They're the areas where you choose to invest your energy and time.",
-    items: [
-      "Personal growth fuels your continuous evolution",
-      "Community impact amplifies your contribution",
-      "Innovation drives meaningful solutions"
-    ]
+  learningStyle: {
+    title: "How You Learn (Learning Style)",
+    field: "passions",
+    type: "string",
+    nodeType: "Skill"
+  },
+  passions: {
+    title: "What you Care About (Passions)",
+    field: "dreams",
+    type: "string",
+    nodeType: "Goal"
+  },
+  goals: {
+    title: "What you Strive For (Goals)",
+    field: "paths",
+    type: "object",
+    nodeType: "Strategy"
   }
 };
 
@@ -68,8 +56,11 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
   const location = useLocation();
   const navigate = useNavigate();
   const [data, setData] = useState<any>(defaultDashboardData);
-  const [hoveredSection, setHoveredSection] = useState<string | null>(null);
   const [isLoaded, setIsLoaded] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [editItem, setEditItem] = useState<{quadrant: string, index: number, value: string | {path: string, details: string}, isNew?: boolean} | null>(null);
+  const [editValue, setEditValue] = useState<string>('');
+  const [editDetails, setEditDetails] = useState<string>('');
 
   useEffect(() => {
     const fetchOrSetSurveyData = async () => {
@@ -144,34 +135,109 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
     }
   };
 
-  const generateSummary = () => {
-    const traits = data.personalTraits?.slice(0, 3).join(", ");
-    const passion = data.passions?.[0];
-    return `You're someone who seeks patterns in chaos, treasures small victories, and imagines a world more connected and kind. Your path is marked by resilience, wonder, and quiet courage.`;
+  const updateKnowledgeGraph = async (updatedData: any) => {
+    if (!username) return;
+    
+    try {
+      // First save the survey data
+      await userService.saveSurvey(username, updatedData);
+      
+      // Then request a knowledge graph update
+      // This could potentially be a different API endpoint in a production app
+      // For now, we'll just refresh the knowledge graph to reflect changes
+      await knowledgeGraphService.getKnowledgeGraph(username);
+    } catch (error) {
+      console.error("Error updating knowledge graph:", error);
+    }
   };
 
-  const renderHoverContent = (section: string) => {
-    const content = hoverContent[section as keyof typeof hoverContent];
-    return (
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="absolute inset-0 bg-gradient-to-b from-purple-900/95 to-blue-900/95 p-6 flex flex-col justify-between"
-      >
-        <div>
-          <h3 className="text-2xl font-bold mb-2 text-white">{content.title}</h3>
-          <p className="text-blue-200 mb-4">{content.description}</p>
-        </div>
-        <div className="space-y-2">
-          {content.items.map((item, index) => (
-            <div key={index} className="bg-white/10 rounded-lg px-4 py-2 text-white backdrop-blur-sm">
-              {item}
-            </div>
-          ))}
-        </div>
-      </motion.div>
-    );
+  const handleEdit = (quadrant: string, index: number, value: any) => {
+    if (quadrant === 'goals') {
+      setEditValue(value.path);
+      setEditDetails(value.details);
+    } else {
+      setEditValue(value);
+    }
+    setEditItem({ quadrant, index, value });
+  };
+
+  const handleAdd = (quadrant: string) => {
+    setEditValue('');
+    setEditDetails('');
+    setEditItem({ 
+      quadrant, 
+      index: -1, 
+      value: quadrant === 'goals' ? { path: '', details: '' } : '',
+      isNew: true 
+    });
+  };
+
+  const handleDelete = async (quadrant: string, index: number) => {
+    setIsUpdating(true);
+    
+    const field = quadrantConfig[quadrant as keyof typeof quadrantConfig].field;
+    const newData = { ...data };
+    newData[field] = [...data[field]];
+    newData[field].splice(index, 1);
+    
+    setData(newData);
+    
+    // Save the updated data
+    localStorage.setItem('potentiallyUserData', JSON.stringify(newData));
+    
+    if (username) {
+      await updateKnowledgeGraph(newData);
+    }
+    
+    setIsUpdating(false);
+  };
+
+  const handleSave = async () => {
+    if (!editItem) return;
+    
+    setIsUpdating(true);
+    
+    const { quadrant, index, isNew } = editItem;
+    const field = quadrantConfig[quadrant as keyof typeof quadrantConfig].field;
+    const newData = { ...data };
+    
+    // Ensure the field exists as an array
+    if (!newData[field]) {
+      newData[field] = [];
+    }
+    
+    // For new items, add to the array
+    if (isNew) {
+      if (quadrant === 'goals') {
+        newData[field].push({ path: editValue, details: editDetails });
+      } else {
+        newData[field].push(editValue);
+      }
+    } 
+    // For existing items, update the value
+    else {
+      if (quadrant === 'goals') {
+        newData[field][index] = { path: editValue, details: editDetails };
+      } else {
+        newData[field][index] = editValue;
+      }
+    }
+    
+    setData(newData);
+    setEditItem(null);
+    
+    // Save the updated data
+    localStorage.setItem('potentiallyUserData', JSON.stringify(newData));
+    
+    if (username) {
+      await updateKnowledgeGraph(newData);
+    }
+    
+    setIsUpdating(false);
+  };
+
+  const handleCancel = () => {
+    setEditItem(null);
   };
 
   const handleKnowledgeGraphClick = () => {
@@ -180,6 +246,171 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
 
   const handleChatClick = () => {
     navigate('/chat');
+  };
+
+  const renderQuadrant = (quadrant: string, title: string, fieldKey: string, itemType: string) => {
+    const items = data[fieldKey] || [];
+    
+    return (
+      <motion.div 
+        whileHover={{ scale: 1.01 }}
+        transition={{ duration: 0.2 }}
+        className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/30 relative overflow-hidden"
+      >
+        <h2 className="text-xl font-semibold mb-4">{title}</h2>
+        <div className="space-y-2 mb-4">
+          {items.map((item: any, idx: number) => {
+            // If this is the item being edited
+            if (editItem && editItem.quadrant === quadrant && editItem.index === idx) {
+              return (
+                <div key={idx} className="bg-white/20 rounded-lg p-3">
+                  {itemType === 'object' ? (
+                    <>
+                      <input
+                        type="text"
+                        value={editValue}
+                        onChange={(e) => setEditValue(e.target.value)}
+                        placeholder="Enter title"
+                        className="w-full mb-2 p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                        autoFocus
+                      />
+                      <textarea
+                        value={editDetails}
+                        onChange={(e) => setEditDetails(e.target.value)}
+                        placeholder="Enter details"
+                        className="w-full p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                        rows={2}
+                      />
+                    </>
+                  ) : (
+                    <input
+                      type="text"
+                      value={editValue}
+                      onChange={(e) => setEditValue(e.target.value)}
+                      className="w-full p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                      autoFocus
+                    />
+                  )}
+                  
+                  <div className="flex justify-end mt-2 space-x-2">
+                    <button 
+                      onClick={handleCancel}
+                      className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                      disabled={isUpdating}
+                    >
+                      <X size={16} />
+                    </button>
+                    <button 
+                      onClick={handleSave}
+                      className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                      disabled={isUpdating || !editValue.trim()}
+                    >
+                      <Check size={16} />
+                    </button>
+                  </div>
+                </div>
+              );
+            }
+            
+            // Regular display
+            return (
+              <div key={idx} className="bg-white/10 rounded-lg px-4 py-2 hover:bg-white/20 transition-colors group relative">
+                {itemType === 'object' ? (
+                  <>
+                    <div className="font-medium">{item.path}</div>
+                    {item.details && (
+                      <div className="text-sm text-blue-200 mt-1">{item.details}</div>
+                    )}
+                  </>
+                ) : (
+                  <div>{item}</div>
+                )}
+                
+                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+                  <button 
+                    onClick={() => handleEdit(quadrant, idx, item)}
+                    className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                    disabled={isUpdating || !!editItem}
+                  >
+                    <Pencil size={14} />
+                  </button>
+                  <button 
+                    onClick={() => handleDelete(quadrant, idx)}
+                    className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                    disabled={isUpdating || !!editItem}
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+          
+          {/* Add new item form */}
+          {editItem && editItem.quadrant === quadrant && editItem.isNew && (
+            <div className="bg-white/20 rounded-lg p-3">
+              {itemType === 'object' ? (
+                <>
+                  <input
+                    type="text"
+                    value={editValue}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    placeholder="Enter title"
+                    className="w-full mb-2 p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                    autoFocus
+                  />
+                  <textarea
+                    value={editDetails}
+                    onChange={(e) => setEditDetails(e.target.value)}
+                    placeholder="Enter details"
+                    className="w-full p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                    rows={2}
+                  />
+                </>
+              ) : (
+                <input
+                  type="text"
+                  value={editValue}
+                  onChange={(e) => setEditValue(e.target.value)}
+                  placeholder="Enter new item"
+                  className="w-full p-2 bg-white/10 rounded border border-white/30 text-white placeholder-white/50"
+                  autoFocus
+                />
+              )}
+              
+              <div className="flex justify-end mt-2 space-x-2">
+                <button 
+                  onClick={handleCancel}
+                  className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                  disabled={isUpdating}
+                >
+                  <X size={16} />
+                </button>
+                <button 
+                  onClick={handleSave}
+                  className="p-1 rounded-full bg-white/20 hover:bg-white/30"
+                  disabled={isUpdating || !editValue.trim()}
+                >
+                  <Check size={16} />
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+        
+        {/* Add button */}
+        {!editItem && (
+          <button 
+            onClick={() => handleAdd(quadrant)}
+            className="w-full flex items-center justify-center p-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors"
+            disabled={isUpdating}
+          >
+            <Plus size={16} className="mr-1" />
+            <span>Add {title.split('(')[0].trim()}</span>
+          </button>
+        )}
+      </motion.div>
+    );
   };
 
   if (!isLoaded) {
@@ -195,139 +426,40 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
       className="min-h-screen bg-gradient-to-b from-purple-800 to-blue-700 p-8 text-white relative"
     >
       <div className="max-w-7xl mx-auto">
-        <motion.div variants={itemVariants} className="text-center mb-16">
+        <motion.div variants={itemVariants} className="text-center mb-8">
           <h1 className="text-5xl font-bold mb-4">
             Welcome to your map, {data.name}
           </h1>
+          <p className="text-xl text-blue-200">
+            Click on any card to add, edit, or delete entries.
+          </p>
         </motion.div>
 
         <motion.div variants={itemVariants} className="relative">
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-32 h-32">
-            <div className="absolute inset-0 bg-white rounded-full opacity-20 blur-md"></div>
-            <div className="absolute inset-0 bg-white/30 rounded-full"></div>
-            {/* If you have a logo, uncomment and update this:
-            <img 
-              src="/potentially.png" 
-              alt="Potentially Logo"
-              className="absolute inset-0 w-full h-full p-4"
-            />
-            */}
-          </div>
-
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="absolute top-0 left-0 w-40 h-px bg-white/30 -rotate-45 -translate-x-full -translate-y-24"></div>
-              <div className="absolute top-0 right-0 w-40 h-px bg-white/30 rotate-45 translate-x-full -translate-y-24"></div>
-            </div>
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-              <div className="absolute bottom-0 left-0 w-40 h-px bg-white/30 rotate-45 -translate-x-full translate-y-24"></div>
-              <div className="absolute bottom-0 right-0 w-40 h-px bg-white/30 -rotate-45 translate-x-full translate-y-24"></div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-x-64 gap-y-32 mb-16">
-            <motion.div 
-              onHoverStart={() => setHoveredSection('values')}
-              onHoverEnd={() => setHoveredSection(null)}
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/30 relative overflow-hidden"
-            >
-              <AnimatePresence>
-                {hoveredSection === 'values' && renderHoverContent('values')}
-              </AnimatePresence>
-              <h2 className="text-2xl font-semibold mb-4">Values</h2>
-              <div className="space-y-2">
-                {data.personalTraits?.map((trait: string, index: number) => (
-                  <div key={index} className="bg-white/10 rounded-lg px-4 py-2 hover:bg-white/20 transition-colors">
-                    {trait}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div 
-              onHoverStart={() => setHoveredSection('dreams')}
-              onHoverEnd={() => setHoveredSection(null)}
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/30 relative overflow-hidden"
-            >
-              <AnimatePresence>
-                {hoveredSection === 'dreams' && renderHoverContent('dreams')}
-              </AnimatePresence>
-              <h2 className="text-2xl font-semibold mb-4">Dreams</h2>
-              <div className="space-y-2">
-                {data.dreams?.map((dream: string, index: number) => (
-                  <div key={index} className="bg-white/10 rounded-lg px-4 py-2 hover:bg-white/20 transition-colors">
-                    {dream}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div 
-              onHoverStart={() => setHoveredSection('strengths')}
-              onHoverEnd={() => setHoveredSection(null)}
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/30 relative overflow-hidden"
-            >
-              <AnimatePresence>
-                {hoveredSection === 'strengths' && renderHoverContent('strengths')}
-              </AnimatePresence>
-              <h2 className="text-2xl font-semibold mb-4">Strengths</h2>
-              <div className="space-y-2">
-                {data.passions?.map((passion: string, index: number) => (
-                  <div key={index} className="bg-white/10 rounded-lg px-4 py-2 hover:bg-white/20 transition-colors">
-                    {passion}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-
-            <motion.div 
-              onHoverStart={() => setHoveredSection('priorities')}
-              onHoverEnd={() => setHoveredSection(null)}
-              whileHover={{ scale: 1.02 }}
-              transition={{ duration: 0.2 }}
-              className="bg-white/5 backdrop-blur-sm rounded-2xl p-6 border border-white/10 hover:border-white/30 relative overflow-hidden"
-            >
-              <AnimatePresence>
-                {hoveredSection === 'priorities' && renderHoverContent('priorities')}
-              </AnimatePresence>
-              <h2 className="text-2xl font-semibold mb-4">Priorities</h2>
-              <div className="space-y-2">
-                {data.paths?.map((path: { path: string, details: string }, index: number) => (
-                  <div key={index} className="bg-white/10 rounded-lg px-4 py-2 hover:bg-white/20 transition-colors">
-                    <div className="font-medium">{path.path}</div>
-                    {path.details && (
-                      <div className="text-sm text-blue-200 mt-1">{path.details}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </motion.div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+            {/* Top Left Quadrant */}
+            {renderQuadrant('strengths', quadrantConfig.strengths.title, quadrantConfig.strengths.field, quadrantConfig.strengths.type)}
+            
+            {/* Top Right Quadrant */}
+            {renderQuadrant('learningStyle', quadrantConfig.learningStyle.title, quadrantConfig.learningStyle.field, quadrantConfig.learningStyle.type)}
+            
+            {/* Bottom Left Quadrant */}
+            {renderQuadrant('passions', quadrantConfig.passions.title, quadrantConfig.passions.field, quadrantConfig.passions.type)}
+            
+            {/* Bottom Right Quadrant */}
+            {renderQuadrant('goals', quadrantConfig.goals.title, quadrantConfig.goals.field, quadrantConfig.goals.type)}
           </div>
 
           <motion.div 
             variants={itemVariants}
-            className="max-w-4xl mx-auto text-center mb-8"
-          >
-            <p className="text-2xl text-blue-200">
-              {generateSummary()}
-            </p>
-          </motion.div>
-
-          <motion.div 
-            variants={itemVariants}
-            className="flex justify-center space-x-6 mt-16"
+            className="flex justify-center space-x-6 mt-8"
           >
             <motion.button
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleKnowledgeGraphClick}
               className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm text-white font-medium transition-colors"
+              disabled={isUpdating}
             >
               View Knowledge Graph
             </motion.button>
@@ -337,6 +469,7 @@ export const Dashboard = ({ username }: DashboardProps): JSX.Element => {
               whileTap={{ scale: 0.95 }}
               onClick={handleChatClick}
               className="px-6 py-3 bg-white/20 hover:bg-white/30 rounded-lg backdrop-blur-sm text-white font-medium transition-colors"
+              disabled={isUpdating}
             >
               Chat with Assistant
             </motion.button>

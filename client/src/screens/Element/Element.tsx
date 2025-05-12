@@ -20,8 +20,8 @@ export const Element = (): JSX.Element => {
   const [showTraitInputs, setShowTraitInputs] = useState([false, false, false]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
-  const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [activityDetails, setActivityDetails] = useState<Record<string, string>>({});
+  const [selectedHobbies, setSelectedHobbies] = useState<string[]>([]);
   const [hobbyDetails, setHobbyDetails] = useState<Record<string, string>>({});
   const [isOpen, setIsOpen] = useState<number | null>(null);
   const [showNextButton, setShowNextButton] = useState(false);
@@ -40,9 +40,13 @@ export const Element = (): JSX.Element => {
   const [showCustomTrait, setShowCustomTrait] = useState(false);
   const [selectedPaths, setSelectedPaths] = useState<string[]>([]);
   const [pathDetails, setPathDetails] = useState<Record<string, string>>({});
+  const [selectedPathReasons, setSelectedPathReasons] = useState<string[]>([]);
+  const [customPathReason, setCustomPathReason] = useState('');
+  const [showCustomPathReason, setShowCustomPathReason] = useState(false);
   const [selectedDreams, setSelectedDreams] = useState<string[]>([]);
   const [customDream, setCustomDream] = useState('');
   const [showCustomDream, setShowCustomDream] = useState(false);
+  const [totalPages, setTotalPages] = useState(9); // Increased for more pages
 
   const grades = ['9th Grader', '10th Grader', '11th Grader', '12th Grader'];
   
@@ -429,21 +433,42 @@ export const Element = (): JSX.Element => {
       setShowNextButton(readyToProgress);
     } else if (currentPage === 4) {
       const activitiesValid = selectedActivities.every(id => !activityDetails[id] || activityDetails[id].trim() !== '');
-      const hobbiesValid = selectedHobbies.every(id => !hobbyDetails[id] || hobbyDetails[id].trim() !== '');
-      const hasSelections = selectedActivities.length > 0 && selectedHobbies.length > 0;
-      setShowNextButton(activitiesValid && hobbiesValid && hasSelections);
+      const hasSelections = selectedActivities.length > 0;
+      setShowNextButton(activitiesValid && hasSelections);
     } else if (currentPage === 5) {
+      const hobbiesValid = selectedHobbies.every(id => !hobbyDetails[id] || hobbyDetails[id].trim() !== '');
+      const hasSelections = selectedHobbies.length > 0;
+      setShowNextButton(hobbiesValid && hasSelections);
+    } else if (currentPage === 6) {
       const passionsValid = selectedPassions.length > 0 || (showCustomPassion && customPassion.trim() !== '');
       const traitsValid = selectedPersonalTraits.length > 0 || (showCustomTrait && customTrait.trim() !== '');
       setShowNextButton(passionsValid && traitsValid);
-    } else if (currentPage === 6) {
-      const pathsValid = selectedPaths.length > 0 && 
-        selectedPaths.every(id => !pathDetails[id] || pathDetails[id].trim() !== '');
-      const reasonsValid = selectedReasons.length > 0;
-      const dreamsValid = selectedDreams.length > 0;
-      setShowNextButton(pathsValid && reasonsValid && dreamsValid);
+    } else if (currentPage === 7) {
+      // Each path gets its own page now
+      const path = postHighSchoolPaths[0]; // college
+      const pathValid = selectedPaths.includes(path.id) ? 
+        (!pathDetails[path.id] || pathDetails[path.id].trim() !== '') : true;
+      setShowNextButton(true); // Always allow proceeding (paths are optional)
+    } else if (currentPage === 8) {
+      // Path reasons page
+      const reasonsValid = selectedPathReasons.length > 0 || 
+        (showCustomPathReason && customPathReason.trim() !== '');
+      setShowNextButton(reasonsValid);
+    } else if (currentPage === 9) {
+      // Dreams page
+      const dreamsValid = selectedDreams.length > 0 ||
+        (showCustomDream && customDream.trim() !== '');
+      setShowNextButton(dreamsValid);
     }
-  }, [currentPage, selectedTraits, customTraits, showTraitInputs, selectedClass, customClassName, selectedReasons, customReason, selectedActivities, selectedHobbies, activityDetails, hobbyDetails, selectedPassions, selectedPersonalTraits, customPassion, customTrait, showCustomPassion, showCustomTrait, selectedPaths, pathDetails, selectedDreams, showCustomDream, customDream]);
+  }, [
+    currentPage, selectedTraits, customTraits, showTraitInputs, 
+    selectedClass, customClassName, selectedReasons, customReason, 
+    selectedActivities, selectedHobbies, activityDetails, hobbyDetails, 
+    selectedPassions, selectedPersonalTraits, customPassion, customTrait, 
+    showCustomPassion, showCustomTrait, selectedPaths, pathDetails, 
+    selectedDreams, showCustomDream, customDream,
+    selectedPathReasons, customPathReason, showCustomPathReason
+  ]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && name.trim() !== '') {
@@ -613,17 +638,17 @@ export const Element = (): JSX.Element => {
     }));
   };
 
-  const handleReasonToggle = (reason: string) => {
-    setSelectedReasons(prev => {
+  const handlePathReasonToggle = (reason: string) => {
+    setSelectedPathReasons(prev => {
       if (prev.includes(reason)) {
         if (reason === 'Other') {
-          setShowCustomReason(false);
-          setCustomReason('');
+          setShowCustomPathReason(false);
+          setCustomPathReason('');
         }
         return prev.filter(r => r !== reason);
       }
       if (reason === 'Other') {
-        setShowCustomReason(true);
+        setShowCustomPathReason(true);
       }
       return [...prev, reason];
     });
@@ -648,7 +673,7 @@ export const Element = (): JSX.Element => {
   const handleNext = () => {
     if (isNavigating) return;
     
-    if (currentPage < 6) {
+    if (currentPage < totalPages) {
       setCurrentPage(prev => prev + 1);
       return;
     }
@@ -685,9 +710,9 @@ export const Element = (): JSX.Element => {
       details: pathDetails[id] || ''
     }));
 
-    const finalPathReasons = selectedReasons.includes('Other') && customReason
-      ? [...selectedReasons.filter(r => r !== 'Other'), customReason]
-      : selectedReasons;
+    const finalPathReasons = selectedPathReasons.includes('Other') && customPathReason
+      ? [...selectedPathReasons.filter(r => r !== 'Other'), customPathReason]
+      : selectedPathReasons;
 
     const finalDreams = selectedDreams.includes('Other') && customDream
       ? [...selectedDreams.filter(d => d !== 'Other'), customDream]
@@ -1165,7 +1190,7 @@ export const Element = (): JSX.Element => {
                     <Typewriter
                       onInit={(typewriter) => {
                         typewriter
-                          .typeString("Tell me about your activities")
+                          .typeString("I participate in:")
                           .start();
                       }}
                       options={{
@@ -1176,80 +1201,39 @@ export const Element = (): JSX.Element => {
                   </div>
 
                   <div className="w-full max-w-[800px] space-y-8">
-                    <div className="space-y-4">
-                      <h2 className="text-[32px] text-white/90">I participate in:</h2>
-                      <div className="grid grid-cols-1 gap-4">
-                        {activities.map((activity) => (
-                          <div key={activity.id} className="space-y-2">
-                            <motion.button
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              onClick={() => handleActivityToggle(activity.id)}
-                              className={`w-full px-6 py-3 rounded-xl text-[20px] border backdrop-blur-sm shadow-lg transition-all duration-300 text-left ${
-                                selectedActivities.includes(activity.id)
-                                  ? 'bg-white/40 text-white border-white shadow-[0_4px_20px_rgba(255,255,255,0.3)]'
-                                  : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border-white/20'
-                              }`}
+                    <div className="grid grid-cols-1 gap-4">
+                      {activities.map((activity) => (
+                        <div key={activity.id} className="space-y-2">
+                          <motion.button
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            onClick={() => handleActivityToggle(activity.id)}
+                            className={`w-full px-6 py-3 rounded-xl text-[20px] border backdrop-blur-sm shadow-lg transition-all duration-300 text-left ${
+                              selectedActivities.includes(activity.id)
+                                ? 'bg-white/40 text-white border-white shadow-[0_4px_20px_rgba(255,255,255,0.3)]'
+                                : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border-white/20'
+                            }`}
+                          >
+                            {activity.label}
+                          </motion.button>
+                          {selectedActivities.includes(activity.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="pl-6"
                             >
-                              {activity.label}
-                            </motion.button>
-                            {selectedActivities.includes(activity.id) && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="pl-6"
-                              >
-                                <input
-                                  type="text"
-                                  value={activityDetails[activity.id] || ''}
-                                  onChange={(e) => handleActivityDetailChange(activity.id, e.target.value)}
-                                  placeholder={activity.prompt}
-                                  className="w-full text-[18px] px-4 py-2 border border-white/20 rounded-lg focus:outline-none focus:border-white/40 bg-white/10 text-white placeholder-white/50 transition-all duration-200 hover:bg-white/15"
-                                />
-                              </motion.div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <h2 className="text-[32px] text-white/90">I spend my time:</h2>
-                      <div className="grid grid-cols-1 gap-4">
-                        {hobbies.map((hobby) => (
-                          <div key={hobby.id} className="space-y-2">
-                            <motion.button
-                              initial={{ opacity: 0, y: 20 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              onClick={() => handleHobbyToggle(hobby.id)}
-                              className={`w-full px-6 py-3 rounded-xl text-[20px] border backdrop-blur-sm shadow-lg transition-all duration-300 text-left ${
-                                selectedHobbies.includes(hobby.id)
-                                  ? 'bg-white/40 text-white border-white shadow-[0_4px_20px_rgba(255,255,255,0.3)]'
-                                  : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border-white/20'
-                              }`}
-                            >
-                              {hobby.label}
-                            </motion.button>
-                            {selectedHobbies.includes(hobby.id) && (
-                              <motion.div
-                                initial={{ opacity: 0, height: 0 }}
-                                animate={{ opacity: 1, height: 'auto' }}
-                                exit={{ opacity: 0, height: 0 }}
-                                className="pl-6"
-                              >
-                                <input
-                                  type="text"
-                                  value={hobbyDetails[hobby.id] || ''}
-                                  onChange={(e) => handleHobbyDetailChange(hobby.id, e.target.value)}
-                                  placeholder={hobby.prompt}
-                                  className="w-full text-[18px] px-4 py-2 border border-white/20 rounded-lg focus:outline-none focus:border-white/40 bg-white/10 text-white placeholder-white/50 transition-all duration-200 hover:bg-white/15"
-                                />
-                              </motion.div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
+                              <input
+                                type="text"
+                                value={activityDetails[activity.id] || ''}
+                                onChange={(e) => handleActivityDetailChange(activity.id, e.target.value)}
+                                placeholder={activity.prompt}
+                                className="w-full text-[18px] px-4 py-2 border border-white/20 rounded-lg focus:outline-none focus:border-white/40 bg-white/10 text-white placeholder-white/50 transition-all duration-200 hover:bg-white/15"
+                              />
+                            </motion.div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -1277,6 +1261,83 @@ export const Element = (): JSX.Element => {
             )}
 
             {currentPage === 5 && (
+              <div className="w-full flex flex-col gap-8 justify-center items-center">
+                <div className="text-[48px] text-white flex flex-col items-center gap-8">
+                  <div className="flex items-center text-center">
+                    <Typewriter
+                      onInit={(typewriter) => {
+                        typewriter
+                          .typeString("I spend my time:")
+                          .start();
+                      }}
+                      options={{
+                        delay: 50,
+                        cursor: ''
+                      }}
+                    />
+                  </div>
+
+                  <div className="w-full max-w-[800px] space-y-8">
+                    <div className="grid grid-cols-1 gap-4">
+                      {hobbies.map((hobby) => (
+                        <div key={hobby.id} className="space-y-2">
+                          <motion.button
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            onClick={() => handleHobbyToggle(hobby.id)}
+                            className={`w-full px-6 py-3 rounded-xl text-[20px] border backdrop-blur-sm shadow-lg transition-all duration-300 text-left ${
+                              selectedHobbies.includes(hobby.id)
+                                ? 'bg-white/40 text-white border-white shadow-[0_4px_20px_rgba(255,255,255,0.3)]'
+                                : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border-white/20'
+                            }`}
+                          >
+                            {hobby.label}
+                          </motion.button>
+                          {selectedHobbies.includes(hobby.id) && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: 'auto' }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="pl-6"
+                            >
+                              <input
+                                type="text"
+                                value={hobbyDetails[hobby.id] || ''}
+                                onChange={(e) => handleHobbyDetailChange(hobby.id, e.target.value)}
+                                placeholder={hobby.prompt}
+                                className="w-full text-[18px] px-4 py-2 border border-white/20 rounded-lg focus:outline-none focus:border-white/40 bg-white/10 text-white placeholder-white/50 transition-all duration-200 hover:bg-white/15"
+                              />
+                            </motion.div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {showNextButton && (
+                  <motion.button
+                    variants={buttonVariants}
+                    initial="initial"
+                    animate="animate"
+                    whileHover="hover"
+                    whileTap="tap"
+                    onClick={handleNext}
+                    className="mt-12 px-12 py-6 bg-white/20 rounded-full text-white text-[28px] font-light tracking-wide backdrop-blur-sm border border-white/20 shadow-lg flex items-center gap-4 relative overflow-hidden"
+                  >
+                    <span>Continue</span>
+                    <motion.div
+                      variants={arrowVariants}
+                      className="flex items-center"
+                    >
+                      <ChevronDown className="w-8 h-8 rotate-[-90deg]" />
+                    </motion.div>
+                  </motion.button>
+                )}
+              </div>
+            )}
+
+            {currentPage === 6 && (
               <div className="w-full flex flex-col gap-8 justify-center items-center">
                 <div className="text-[48px] text-white flex flex-col items-center gap-12">
                   <div className="space-y-8">
@@ -1402,7 +1463,7 @@ export const Element = (): JSX.Element => {
               </div>
             )}
 
-            {currentPage === 6 && (
+            {currentPage === 7 && (
               <div className="w-full flex flex-col gap-8 justify-center items-center">
                 <div className="text-[48px] text-white flex flex-col items-center gap-12">
                   <div className="space-y-8">
@@ -1459,7 +1520,33 @@ export const Element = (): JSX.Element => {
                       </div>
                     </div>
                   </div>
+                </div>
 
+                {showNextButton && (
+                  <motion.button
+                    variants={buttonVariants}
+                    initial="initial"
+                    animate="animate"
+                    whileHover="hover"
+                    whileTap="tap"
+                    onClick={handleNext}
+                    className="mt-12 px-12 py-6 bg-white/20 rounded-full text-white text-[28px] font-light tracking-wide backdrop-blur-sm border border-white/20 shadow-lg flex items-center gap-4 relative overflow-hidden"
+                  >
+                    <span>Continue</span>
+                    <motion.div
+                      variants={arrowVariants}
+                      className="flex items-center"
+                    >
+                      <ChevronDown className="w-8 h-8 rotate-[-90deg]" />
+                    </motion.div>
+                  </motion.button>
+                )}
+              </div>
+            )}
+
+            {currentPage === 8 && (
+              <div className="w-full flex flex-col gap-8 justify-center items-center">
+                <div className="text-[48px] text-white flex flex-col items-center gap-12">
                   <div className="space-y-8">
                     <div className="flex items-center text-center">
                       <Typewriter
@@ -1476,7 +1563,7 @@ export const Element = (): JSX.Element => {
                     </div>
                     <div className="w-full max-w-[800px] space-y-4">
                       <div className="text-[24px] text-white/70 mb-4">
-                        Why does that path interest you? (Select all that apply)
+                        Why do these paths interest you? (Select all that apply)
                       </div>
                       <div className="grid grid-cols-1 gap-4">
                         {pathReasons.map((reason, index) => (
@@ -1484,9 +1571,9 @@ export const Element = (): JSX.Element => {
                             key={index}
                             initial={{ opacity: 0, y: 20 }}
                             animate={{ opacity: 1, y: 0 }}
-                            onClick={() => handleReasonToggle(reason)}
+                            onClick={() => handlePathReasonToggle(reason)}
                             className={`w-full px-6 py-3 rounded-xl text-[20px] border backdrop-blur-sm shadow-lg transition-all duration-300 text-left ${
-                              selectedReasons.includes(reason)
+                              selectedPathReasons.includes(reason)
                                 ? 'bg-white/40 text-white border-white shadow-[0_4px_20px_rgba(255,255,255,0.3)]'
                                 : 'bg-white/10 text-white/70 hover:bg-white/20 hover:text-white border-white/20'
                             }`}
@@ -1495,7 +1582,7 @@ export const Element = (): JSX.Element => {
                           </motion.button>
                         ))}
                       </div>
-                      {showCustomReason && (
+                      {showCustomPathReason && (
                         <motion.div
                           initial={{ opacity: 0, height: 0 }}
                           animate={{ opacity: 1, height: 'auto' }}
@@ -1504,8 +1591,8 @@ export const Element = (): JSX.Element => {
                         >
                           <input
                             type="text"
-                            value={customReason}
-                            onChange={(e) => setCustomReason(e.target.value)}
+                            value={customPathReason}
+                            onChange={(e) => setCustomPathReason(e.target.value)}
                             placeholder="Please describe your reason..."
                             className="w-full text-[18px] px-4 py-2 border border-white/20 rounded-lg focus:outline-none focus:border-white/40 bg-white/10 text-white placeholder-white/50 transition-all duration-200 hover:bg-white/15"
                             autoFocus
@@ -1514,7 +1601,33 @@ export const Element = (): JSX.Element => {
                       )}
                     </div>
                   </div>
+                </div>
 
+                {showNextButton && (
+                  <motion.button
+                    variants={buttonVariants}
+                    initial="initial"
+                    animate="animate"
+                    whileHover="hover"
+                    whileTap="tap"
+                    onClick={handleNext}
+                    className="mt-12 px-12 py-6 bg-white/20 rounded-full text-white text-[28px] font-light tracking-wide backdrop-blur-sm border border-white/20 shadow-lg flex items-center gap-4 relative overflow-hidden"
+                  >
+                    <span>Continue</span>
+                    <motion.div
+                      variants={arrowVariants}
+                      className="flex items-center"
+                    >
+                      <ChevronDown className="w-8 h-8 rotate-[-90deg]" />
+                    </motion.div>
+                  </motion.button>
+                )}
+              </div>
+            )}
+
+            {currentPage === 9 && (
+              <div className="w-full flex flex-col gap-8 justify-center items-center">
+                <div className="text-[48px] text-white flex flex-col items-center gap-12">
                   <div className="space-y-8">
                     <div className="flex items-center text-center">
                       <Typewriter
@@ -1581,7 +1694,7 @@ export const Element = (): JSX.Element => {
                     onClick={handleNext}
                     className="mt-12 px-12 py-6 bg-white/20 rounded-full text-white text-[28px] font-light tracking-wide backdrop-blur-sm border border-white/20 shadow-lg flex items-center gap-4 relative overflow-hidden"
                   >
-                    <span>Continue</span>
+                    <span>Continue to Dashboard</span>
                     <motion.div
                       variants={arrowVariants}
                       className="flex items-center"
