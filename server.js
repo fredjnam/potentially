@@ -8,6 +8,7 @@ const morgan = require('morgan');
 
 // Load environment variables
 dotenv.config();
+console.log('DEBUG - NEO4J_URI:', process.env.NEO4J_URI);
 
 // Initialize Express app
 const app = express();
